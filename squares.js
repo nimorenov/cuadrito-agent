@@ -197,6 +197,17 @@ class Board {
     return " "
   }
 
+  // Returns captured square counts: R = Red's captures (-2 cells), Y = Yellow's (-1 cells)
+  countScores(board) {
+    var r = 0, y = 0
+    for (var i = 0; i < board.length; i++)
+      for (var j = 0; j < board.length; j++) {
+        if (board[i][j] === -1) r++
+        else if (board[i][j] === -2) y++
+      }
+    return { R: r, Y: y }
+  }
+
   // Draw the board on the canvas
   print(board) {
     var size = board.length
@@ -367,6 +378,157 @@ class AgentAvocadoRandom extends Agent {
   }
 }
 
+class AgentAvocadoClaude extends Agent {
+  constructor() {
+    super()
+    this.board_util = new Board()
+  }
+
+  init(color, board, time = 20000) {
+    super.init(color, board, time)
+    this.colorInt = color == 'R' ? -1 : -2
+    // Game quirk: move() stores captures as ocolor, so my cells have opposite sign
+    this.myFill = this.colorInt == -1 ? -2 : -1
+    this.oppFill = this.colorInt          // opponent's cells stored as my colorInt
+    this.oppColorInt = this.myFill        // opponent plays with myFill value
+  }
+
+  countLines(board, r, c) {
+    if (r < 0 || r >= board.length || c < 0 || c >= board.length) return -1
+    const val = board[r][c]
+    if (val < 0) return 4
+    let n = 0
+    for (let i = 0; i < 4; i++) if (val & (1 << i)) n++
+    return n
+  }
+
+  evalScore(board) {
+    let mine = 0, theirs = 0
+    for (let i = 0; i < board.length; i++)
+      for (let j = 0; j < board.length; j++) {
+        if (board[i][j] === this.myFill) mine++
+        else if (board[i][j] === this.oppFill) theirs++
+      }
+    return mine - theirs
+  }
+
+  // Returns 'w' (winning), 's' (safe), or 'd' (desperate)
+  categorizeMove(board, r, c, s) {
+    const cur = this.countLines(board, r, c) + 1
+    const dirs = [[-1, 0], [0, 1], [1, 0], [0, -1]]
+    const adjLines = this.countLines(board, r + dirs[s][0], c + dirs[s][1])
+    const adjNew = (adjLines >= 0 && adjLines < 4) ? adjLines + 1 : 0
+    const mx = Math.max(cur, adjNew)
+    return mx >= 4 ? 'w' : mx < 3 ? 's' : 'd'
+  }
+
+  splitMoves(board, moves) {
+    const cats = { w: [], s: [], d: [] }
+    for (const mv of moves) cats[this.categorizeMove(board, mv[0], mv[1], mv[2])].push(mv)
+    return cats
+  }
+
+  detectChains(board) {
+    const n = board.length
+    const vis = Array.from({ length: n }, () => new Array(n).fill(false))
+    const chains = []
+    for (let i = 0; i < n; i++) {
+      for (let j = 0; j < n; j++) {
+        if (!vis[i][j] && board[i][j] >= 0 && this.countLines(board, i, j) === 3) {
+          const chain = []
+          const q = [[i, j]]
+          vis[i][j] = true
+          while (q.length) {
+            const [r, c] = q.shift()
+            chain.push([r, c])
+            for (const [dr, dc] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
+              const nr = r + dr, nc = c + dc
+              if (nr >= 0 && nr < n && nc >= 0 && nc < n &&
+                !vis[nr][nc] && board[nr][nc] >= 0 &&
+                this.countLines(board, nr, nc) === 3) {
+                vis[nr][nc] = true
+                q.push([nr, nc])
+              }
+            }
+          }
+          chains.push(chain)
+        }
+      }
+    }
+    return chains
+  }
+
+  // Pick desperate move that leaves the smallest max-chain on board
+  openShortestChain(board, moves) {
+    let best = moves[0], bestMax = Infinity
+    for (const mv of moves) {
+      const b = this.board_util.clone(board)
+      this.board_util.move(b, mv[0], mv[1], mv[2], this.colorInt)
+      const chains = this.detectChains(b)
+      const maxLen = chains.reduce((m, c) => Math.max(m, c.length), 0)
+      if (maxLen < bestMax) { bestMax = maxLen; best = mv }
+    }
+    return best
+  }
+
+  minimax(board, depth, alpha, beta, myTurn, deadline) {
+    if (Date.now() >= deadline) return { score: this.evalScore(board), move: null }
+    const moves = this.board_util.valid_moves(board)
+    if (!moves.length || !depth) return { score: this.evalScore(board), move: null }
+
+    const color = myTurn ? this.colorInt : this.oppColorInt
+    const cats = this.splitMoves(board, moves)
+    const ordered = [...cats.w, ...cats.s, ...cats.d]
+
+    let bestMove = ordered[0]
+    let bestScore = myTurn ? -Infinity : Infinity
+
+    for (const mv of ordered) {
+      if (Date.now() >= deadline) break
+      const b = this.board_util.clone(board)
+      this.board_util.move(b, mv[0], mv[1], mv[2], color)
+      const { score } = this.minimax(b, depth - 1, alpha, beta, !myTurn, deadline)
+      if (myTurn ? score > bestScore : score < bestScore) {
+        bestScore = score
+        bestMove = mv
+      }
+      if (myTurn) alpha = Math.max(alpha, bestScore)
+      else beta = Math.min(beta, bestScore)
+      if (beta <= alpha) break
+    }
+    return { score: bestScore, move: bestMove }
+  }
+
+  compute(board, time) {
+    const moves = this.board_util.valid_moves(board)
+    if (!moves.length) return [0, 0, 0]
+
+    const cats = this.splitMoves(board, moves)
+
+    // Layer 1: take free square immediately
+    if (cats.w.length) return cats.w[0]
+
+    // Time budget: 70% of fair share, capped at 2s, floor at 30ms
+    const remaining = Math.max(1, Math.floor(moves.length / 2))
+    const limit = Math.min(Math.max((time / remaining) * 0.7, 30), 2000)
+    const deadline = Date.now() + limit
+
+    // Fallback (used if minimax times out before depth=1 completes)
+    let best = cats.s.length
+      ? cats.s[Math.floor(Math.random() * cats.s.length)]
+      : this.openShortestChain(board, cats.d.length ? cats.d : moves)
+
+    // Iterative-deepening alpha-beta minimax
+    for (let d = 1; d <= 12; d++) {
+      if (Date.now() >= deadline) break
+      const result = this.minimax(board, d, -Infinity, Infinity, true, deadline)
+      if (result.move) best = result.move
+    }
+
+    return best
+  }
+}
+
 /*
  * Environment (Cannot be modified or any of its attributes accesed directly)
  */
@@ -399,6 +561,8 @@ class Environment extends MainClient {
     this.ptime = { R: time, Y: time }
     Konekti.vc("R_time").innerHTML = "" + time
     Konekti.vc("Y_time").innerHTML = "" + time
+    Konekti.vc("R_score").innerHTML = "0"
+    Konekti.vc("Y_score").innerHTML = "0"
     this.player = "R"
     this.winner = ""
 
@@ -467,9 +631,25 @@ class Environment extends MainClient {
       }
 
       board.print(x.rb)
+      var sc = board.countScores(x.rb)
+      Konekti.vc("R_score").innerHTML = "" + sc.R
+      Konekti.vc("Y_score").innerHTML = "" + sc.Y
       start = -1
       if (x.winner == "") setTimeout(compute, TIME)
-      else Konekti.vc("log").innerHTML = "The winner is " + x.winner
+      else {
+        var wname, wcolor
+        if (x.winner == "R") { wname = x.white; wcolor = "#cc0000" }
+        else if (x.winner == "Y") { wname = x.black; wcolor = "#b8a000" }
+        else { wname = x.winner; wcolor = "#333" }
+        Konekti.vc("log").innerHTML = "The winner is " + wname
+        var overlay = document.getElementById("winner-overlay")
+        var msg = document.getElementById("winner-msg")
+        if (overlay && msg) {
+          msg.innerHTML = "&#x25a0; " + wname + " wins!<br><small style='font-size:0.45em;color:#888;font-weight:normal'>click to close</small>"
+          msg.style.color = wcolor
+          overlay.style.display = "flex"
+        }
+      }
     }
 
     board.print(x.rb)

@@ -21,6 +21,16 @@
   </head>
 
   <body>
+    <div id="winner-overlay" onclick="this.style.display='none'"
+      style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;
+             background:rgba(0,0,0,0.75);z-index:1000;cursor:pointer;
+             display:none;align-items:center;justify-content:center;">
+      <div id="winner-msg"
+        style="padding:48px 72px;background:#fff;border-radius:20px;
+               text-align:center;font-size:2.2em;font-weight:bold;
+               box-shadow:0 8px 40px rgba(0,0,0,0.4);pointer-events:none;">
+      </div>
+    </div>
     <script>
       Konekti.uses("header", "navbar", "canvas");
 
@@ -32,6 +42,7 @@
           rand2: new RandomPlayer(),
           agentAvocadoGemini: new AgentAvocadoGemini(),
           agentAvocadoRandom: new AgentAvocadoRandom(),
+          agentAvocadoClaude: new AgentAvocadoClaude(),
           // Add your agent here: for example if you create a class "MyAgent" and your team is "RexTeam" add something like
           //'RexTeam': new MyAgent()
           // You will be able to call it from the interface using the name of your team playing with red or yellow pieces
@@ -106,6 +117,19 @@
           {
             plugin: "raw",
             setup: [
+              "R_score",
+              "&#xf0c8; Red: 0",
+              {
+                width: "150px",
+                class: "w3-bar-item w3-input w3-border w3-round-xlarge w3-red",
+                style:
+                  "margin-top:2px;margin-bottom:2px;font-family: FontAwesome, Arial, Verdana, sans-serif;",
+              },
+            ],
+          },
+          {
+            plugin: "raw",
+            setup: [
               "Y",
               "",
               {
@@ -126,6 +150,19 @@
               {
                 width: "150px",
                 class: "w3-bar-item w3-input w3-border w3-round-xlarge",
+                style:
+                  "margin-top:2px;margin-bottom:2px;font-family: FontAwesome, Arial, Verdana, sans-serif;",
+              },
+            ],
+          },
+          {
+            plugin: "raw",
+            setup: [
+              "Y_score",
+              "&#xf0c8; Yellow: 0",
+              {
+                width: "150px",
+                class: "w3-bar-item w3-input w3-border w3-round-xlarge w3-yellow",
                 style:
                   "margin-top:2px;margin-bottom:2px;font-family: FontAwesome, Arial, Verdana, sans-serif;",
               },
