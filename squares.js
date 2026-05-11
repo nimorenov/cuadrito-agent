@@ -344,6 +344,20 @@ class AgentAvocado2 extends Agent {
     this.board = new Board()
   }
 
+  countLines(board, r, c) {
+    /**
+     * Cuenta cuántas líneas tiene actualmente un cuadrado específico
+     */
+    if (r < 0 || r >= board.length || c < 0 || c >= board.length) return -1
+    let val = board[r][c]
+    if (val < 0) return 4 // Ya está capturado
+    let count = 0
+    for (let i = 0; i < 4; i++) {
+      if ((val & (1 << i)) !== 0) count++
+    }
+    return count
+  }
+
   compute(board, time) {
     var moves = this.board.valid_moves(board)
     console.log({ board, moves, time })
