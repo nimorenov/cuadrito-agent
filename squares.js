@@ -349,6 +349,71 @@ class AgentAvocadoGemini extends Agent {
   }
 }
 
+class AgentAvocadoOpen extends Agent {
+  constructor() {
+    super()
+    this.board_util = new Board()
+  }
+
+  countLines(board, r, c) {
+    if (r < 0 || r >= board.length || c < 0 || c >= board.length) return -1
+    let val = board[r][c]
+    if (val < 0) return 4
+    let count = 0
+    for (let i = 0; i < 4; i++) {
+      if ((val & (1 << i)) !== 0) count++
+    }
+    return count
+  }
+
+  compute(board, time) {
+    const moves = this.board_util.valid_moves(board)
+    const ply = this.color === "R" ? -1 : -2
+
+    let capturingMoves = []
+    let safeMoves = []
+    let dangerousMoves = []
+
+    for (let move of moves) {
+      let [r, c, s] = move
+      let b = this.board_util.clone(board)
+      this.board_util.move(b, r, c, s, ply)
+
+      let captured = 0
+      for (let i = 0; i < b.length; i++)
+        for (let j = 0; j < b.length; j++)
+          if (b[i][j] === ply && board[i][j] !== ply) captured++
+
+      if (captured > 0) {
+        capturingMoves.push({ move, captured })
+      } else {
+        let danger = false
+        let pairs = [[r, c]]
+        if (s === 0 && r > 0) pairs.push([r - 1, c])
+        if (s === 1 && c < board.length - 1) pairs.push([r, c + 1])
+        if (s === 2 && r < board.length - 1) pairs.push([r + 1, c])
+        if (s === 3 && c > 0) pairs.push([r, c - 1])
+        for (let [qr, qc] of pairs) {
+          if (this.countLines(b, qr, qc) >= 3) { danger = true; break }
+        }
+        if (danger) dangerousMoves.push(move)
+        else safeMoves.push(move)
+      }
+    }
+
+    if (capturingMoves.length > 0) {
+      let maxCap = Math.max(...capturingMoves.map((m) => m.captured))
+      let best = capturingMoves.filter((m) => m.captured === maxCap)
+      return best[Math.floor(Math.random() * best.length)].move
+    }
+
+    if (safeMoves.length > 0)
+      return safeMoves[Math.floor(Math.random() * safeMoves.length)]
+
+    return dangerousMoves[Math.floor(Math.random() * dangerousMoves.length)]
+  }
+}
+
 class AgentAvocadoRandom extends Agent {
   constructor() {
     super()
