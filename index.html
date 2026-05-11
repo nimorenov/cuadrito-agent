@@ -22,27 +22,27 @@
 
   <body>
     <script>
-      Konekti.uses("header", "navbar", "canvas")
+      Konekti.uses("header", "navbar", "canvas");
 
       // Main function using the Konekti infrastructure
       function KonektiMain() {
-        var client = new Environment()
+        var client = new Environment();
         client.setPlayers({
           rand1: new RandomPlayer(),
           rand2: new RandomPlayer(),
-          agentAvocado : new AgentAvocado(),
-          agentAvocado2: new AgentAvocado2()
+          agentAvocadoGemini: new AgentAvocadoGemini(),
+          agentAvocadoRandom: new AgentAvocadoRandom(),
           // Add your agent here: for example if you create a class "MyAgent" and your team is "RexTeam" add something like
           //'RexTeam': new MyAgent()
           // You will be able to call it from the interface using the name of your team playing with red or yellow pieces
           // If you want just to test this code, yo can use in the interface rand1 (red input) and rand2 (yellow input).
           // Size can be set to an integer number (size of the board) and time is given in seconds.
-        })
+        });
 
         Konekti.header("title", "", "Squares", 3, {
           class: "w3-black w3-center",
-        })
-        Konekti.raw("log", "The winner is...")
+        });
+        Konekti.raw("log", "The winner is...");
         // Connects the video with the HTML component
         var btn2 = [
           {
@@ -141,16 +141,19 @@
               { title: "Cara", class: "w3-right" },
             ],
           },
-        ]
+        ];
         Konekti.navbar(
           "navbar2",
           btn2,
           { client: "client", method: "play" },
           { class: "w3-black w3-medium" },
-        )
+        );
         // Connecting the canvas to the HTML component
-        var commands = custom_commands()
-        Konekti.canvas("canvas", {}, commands, { width: "100%", height: "fit" })
+        var commands = custom_commands();
+        Konekti.canvas("canvas", {}, commands, {
+          width: "100%",
+          height: "fit",
+        });
       }
     </script>
   </body>

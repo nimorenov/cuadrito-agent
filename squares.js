@@ -253,7 +253,7 @@ class RandomPlayer extends Agent {
   }
 }
 
-class AgentAvocado extends Agent {
+class AgentAvocadoGemini extends Agent {
   constructor() {
     super()
     this.board_util = new Board()
@@ -338,7 +338,7 @@ class AgentAvocado extends Agent {
   }
 }
 
-class AgentAvocado2 extends Agent {
+class AgentAvocadoRandom extends Agent {
   constructor() {
     super()
     this.board = new Board()
